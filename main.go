@@ -1,9 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
-	"strconv"
 	"sync/atomic"
 )
 
@@ -20,9 +20,14 @@ func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
 
 func (cfg *apiConfig) getFileserverHits() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Hits: " + strconv.Itoa(int(cfg.fileserverHits.Load()))))
+		w.Write([]byte(fmt.Sprintf(`<html>
+  <body>
+    <h1>Welcome, Chirpy Admin</h1>
+    <p>Chirpy has been visited %d times!</p>
+  </body>
+</html>`, cfg.fileserverHits.Load())))
 	})
 }
 
@@ -43,9 +48,11 @@ func main() {
 		Handler: mux,
 	}
 
+	mux.Handle("GET /admin/metrics", cfg.getFileserverHits())
+	mux.Handle("POST /admin/reset", cfg.resetFileserverHits())
+
 	mux.HandleFunc("GET /api/healthz", handleHealthz)
-	mux.Handle("GET /api/metrics", cfg.getFileserverHits())
-	mux.Handle("POST  /api/reset", cfg.resetFileserverHits())
+
 	mux.Handle("/app/", http.StripPrefix("/app", cfg.middlewareMetricsInc(http.FileServer(http.Dir(".")))))
 
 	log.Println("Starting server...")
